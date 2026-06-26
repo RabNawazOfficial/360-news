@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface TranslateProps {
   children: string;

@@ -10,12 +10,12 @@ import {
   ArrowDown,
   Globe
 } from 'lucide-react';
-import { Sidebar } from './components/Sidebar';
-import { RightPanel } from './components/RightPanel';
-import { ReelCard } from './components/ReelCard';
-import { SearchModal } from './components/SearchModal';
-import { newsData } from './data/news';
-import { useLanguage, languages } from './context/LanguageContext';
+import { Sidebar } from '@/components/sidebar/Sidebar';
+import { RightPanel } from '@/components/layout/RightPanel';
+import { ReelCard } from '@/components/cards/ReelCard';
+import { SearchModal } from '@/components/common/SearchModal';
+import { newsData } from '@/data/news';
+import { useLanguage, languages } from '@/contexts/LanguageContext';
 
 function App() {
   const [activeTab, setActiveTab] = useState<string>('feed');

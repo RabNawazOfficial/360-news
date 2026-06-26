@@ -15,9 +15,9 @@ import {
   Plus,
   Minus
 } from 'lucide-react';
-import type { NewsStory } from '../data/news';
-import { useLanguage } from '../context/LanguageContext';
-import { Translate } from './Translate';
+import type { NewsStory } from '@/data/news';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Translate } from '@/components/common/Translate';
 
 interface ReelCardProps {
   story: NewsStory;

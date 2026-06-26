@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Compass
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SidebarProps {
   activeTab: string;
