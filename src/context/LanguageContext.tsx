@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
-export type LanguageCode = 'en' | 'hi' | 'fr' | 'ar' | 'zh' | 'ja' | 'ko';
+export type LanguageCode = 'en' | 'hi' | 'fr' | 'ar' | 'zh' | 'ja' | 'ko' | 'bn';
 
 export interface Language {
   code: LanguageCode;
@@ -12,6 +12,7 @@ export interface Language {
 export const languages: Language[] = [
   { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩' },
   { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇦🇪' },
   { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
@@ -21,6 +22,64 @@ export const languages: Language[] = [
 
 const translations: Record<LanguageCode, Record<string, string>> = {
   en: {}, // English keys are default
+  bn: {
+    "Feed": "ফিড",
+    "Trending": "ট্রেন্ডিং",
+    "Bookmarks": "বুকমার্ক",
+    "Categories": "বিভাগ",
+    "World": "বিশ্ব",
+    "Politics": "রাজনীতি",
+    "Technology": "প্রযুক্তি",
+    "Business": "ব্যবসা",
+    "Science": "বিজ্ঞান",
+    "Health": "স্বাস্থ্য",
+    "Sports": "খেলাধুলা",
+    "World News": "বিশ্ব সংবাদ",
+    "Fact Checked": "ফ্যাক্ট চেক করা",
+    "Trust Score": "বিশ্বাসযোগ্যতা স্কোর",
+    "Facts": "তথ্য",
+    "Progressive View": "প্রগতিশীল দৃষ্টিভঙ্গি",
+    "Conservative View": "রক্ষণশীল দৃষ্টিভঙ্গি",
+    "Source Headline Comparison": "উৎস শিরোনাম তুলনা",
+    "Story Timeline": "ঘটনার সময়রেখা",
+    "AI Metadata Analysis": "এআই মেটাডেটা বিশ্লেষণ",
+    "AI Confidence Score": "এআই আত্মবিশ্বাস স্কোর",
+    "Bias Deviation": "পক্ষপাত বিচ্যুতি",
+    "Source Diversity Score": "উৎস বৈচিত্র্য স্কোর",
+    "Saved for Later": "পরে দেখার জন্য সংরক্ষিত",
+    "AI Recommendations": "এআই সুপারিশমালা",
+    "Daily Bias Meter": "দৈনিক পক্ষপাত পরিমাপক",
+    "Perfect Balance": "নিখুঁত ভারসাম্য",
+    "Trending Topics": "ট্রেন্ডিং বিষয়সমূহ",
+    "Fact Check Center": "ফ্যাক্ট চেক কেন্দ্র",
+    "Search news and viewpoints...": "সংবাদ এবং দৃষ্টিভঙ্গি অনুসন্ধান করুন...",
+    "Search news, facts, perspectives...": "সংবাদ, তথ্য, দৃষ্টিভঙ্গি অনুসন্ধান করুন...",
+    "Filter by Category": "বিভাগ অনুযায়ী ফিল্টার করুন",
+    "All News": "সব সংবাদ",
+    "Recent Searches": "সাম্প্রতিক অনুসন্ধানসমূহ",
+    "Trending Right Now": "এই মুহূর্তে ট্রেন্ডিং",
+    "Search Results": "অনুসন্ধানের ফলাফল",
+    "All Categories": "সব বিভাগ",
+    "Home": "হোম",
+    "Category": "বিভাগ",
+    "Factual Base Analysis": "তথ্যভিত্তিক বিশ্লেষণ",
+    "Left-Leaning Media Framing": "বামপন্থী মিডিয়া ফ্রেমিং",
+    "Right-Leaning Media Framing": "ডানপন্থী মিডিয়া ফ্রেমিং",
+    "Compare framing & trust rankings": "ফ্রেমিং এবং বিশ্বাসযোগ্যতা র‍্যাঙ্কিং তুলনা করুন",
+    "Chronological sequence of events": "ঘটনাক্রমের কালানুক্রমিক ধারা",
+    "Accuracy score based on cross-referenced sources.": "ক্রস-রেফারেন্সড উৎসের ওপর ভিত্তি করে নির্ভুলতার স্কোর।",
+    "Percentage of opinionated language detected in raw reporting. Lower is cleaner.": "মূল প্রতিবেদনে ব্যক্তিগত মতামতের ভাষার শতকরা হার। কম হওয়া মানে বেশি নিরপেক্ষ।",
+    "Scored on the variety of global news networks aggregated.": "সংগৃহীত বিশ্বব্যাপী সংবাদ নেটওয়ার্কের বৈচিত্র্যের ওপর ভিত্তি করে স্কোর করা হয়েছে।",
+    "No stories match your criteria": "আপনার খোঁজা বিষয়ের সাথে কোনো সংবাদ মেলেনি",
+    "Try clearing your search filters, changing categories, or bookmarks to explore 360 News.": "৩৬০ নিউজ অন্বেষণ করতে আপনার অনুসন্ধান ফিল্টারগুলি পরিষ্কার করুন, বিভাগ বা বুকমার্কগুলি পরিবর্তন করুন।",
+    "Reset All Filters": "সব ফিল্টার রিসেট করুন",
+    "Factual • Balanced • Swift": "তথ্যভিত্তিক • ভারসাম্যপূর্ণ • দ্রুত",
+    "No bookmarks saved yet.": "এখনো কোনো বুকমার্ক সংরক্ষিত নেই।",
+    "You read perspective A and B equally today. Keep it up!": "আপনি আজ দৃষ্টিভঙ্গি A এবং B সমানভাবে পড়েছেন। এটি বজায় রাখুন!",
+    "Esc": "Esc",
+    "Fact Check": "ফ্যাক্ট চেক",
+    "Link Copied!": "লিঙ্ক কপি করা হয়েছে!"
+  },
   hi: {
     "Feed": "फ़ीड",
     "Trending": "ट्रेंडिंग",
