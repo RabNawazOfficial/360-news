@@ -6,10 +6,8 @@ import { ApiResponse } from '../interfaces/api.interface';
 const router = Router();
 
 /**
- * Health Check API Endpoint.
- * 
- * Verifies if the service is running and responsive. Used for
- * liveness probes or deployment verification.
+ * Health check endpoint.
+ * Kept at /api/health for system diagnostic probes.
  */
 router.get('/health', (_req, res) => {
   const response: ApiResponse = {
@@ -20,9 +18,13 @@ router.get('/health', (_req, res) => {
   res.status(HTTP_STATUS.OK).json(response);
 });
 
-/**
- * Mount sub-routers for news domain.
- */
-router.use('/news', newsRoutes);
+// Define and structure v1 namespace sub-routes
+const v1Router = Router();
+
+// Mount news-related endpoint handlers under /api/v1/news
+v1Router.use('/news', newsRoutes);
+
+// Mount versioned sub-routers
+router.use('/v1', v1Router);
 
 export default router;

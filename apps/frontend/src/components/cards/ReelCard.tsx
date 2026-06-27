@@ -114,6 +114,8 @@ export const ReelCard: React.FC<ReelCardProps> = ({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-textSecondary/80">
               <Translate as="span" className="font-semibold text-white">{story.source}</Translate>
               <span>•</span>
+              <Translate as="span">{story.author || t("Unknown Author")}</Translate>
+              <span>•</span>
               <Translate as="span">{story.publishTime}</Translate>
               <span>•</span>
               <Translate as="span">{story.readTime}</Translate>

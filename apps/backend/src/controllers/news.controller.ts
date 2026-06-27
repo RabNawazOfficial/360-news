@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { NewsService } from '../services/news.service';
 import { HTTP_STATUS } from '../constants';
-import { ApiResponse, PaginatedResponse } from '../interfaces/api.interface';
+import { ApiResponse } from '../interfaces/api.interface';
 import { GetNewsQuery } from '../validators/news.validator';
-import { NewsArticle } from '../services/news.service';
+import { NormalizedArticle } from '../services/news.service';
 
 /**
- * Controller to manage news endpoints.
+ * Controller class to manage incoming HTTP requests targeting news operations.
  */
 export class NewsController {
   private readonly newsService: NewsService;
@@ -16,14 +16,14 @@ export class NewsController {
   }
 
   /**
-   * HTTP Handler to fetch news articles with pagination metadata.
+   * HTTP Request Handler to fetch normalized news articles.
    * 
-   * Reads validated query parameters, delegates to NewsService,
-   * constructs paginated response, and returns standard JSON payload.
+   * Reads and casts the validated query params, fetches articles using the NewsService,
+   * wraps the normalized array in our standard response envelope, and returns it.
    * 
    * @param req Express Request object
    * @param res Express Response object
-   * @param next Express NextFunction for middleware chaining/error-handling
+   * @param next Express NextFunction for forwarding errors
    */
   public getNews = async (
     req: Request,
@@ -34,24 +34,12 @@ export class NewsController {
       // Cast the validated and coerced query params from the validation middleware
       const queryParams = req.query as unknown as GetNewsQuery;
 
-      const { items, totalItems } = await this.newsService.getArticles(queryParams);
+      const { items } = await this.newsService.getArticles(queryParams);
 
-      const totalPages = Math.ceil(totalItems / queryParams.limit);
-
-      const paginatedData: PaginatedResponse<NewsArticle> = {
-        items,
-        pagination: {
-          page: queryParams.page,
-          limit: queryParams.limit,
-          totalItems,
-          totalPages,
-        },
-      };
-
-      const response: ApiResponse<PaginatedResponse<NewsArticle>> = {
+      const response: ApiResponse<NormalizedArticle[]> = {
         success: true,
         message: 'Successfully retrieved news articles.',
-        data: paginatedData,
+        data: items,
         timestamp: new Date().toISOString(),
       };
 

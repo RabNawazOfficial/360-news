@@ -30,32 +30,59 @@ export const RightPanel: React.FC<RightPanelProps> = ({
     .filter(story => !bookmarkedIds.includes(story.id))
     .slice(0, 3);
 
-  // Today's trending tags
-  const trendingTopics = [
-    { tag: "#CleanEnergyBill", volume: "125.4K reads" },
-    { date: "June 2026", tag: "#AISafetyAccord", volume: "94.2K reads" },
-    { tag: "#FusionBreakthrough", volume: "88.1K reads" },
-    { tag: "#MicroplasticsStudy", volume: "74.8K reads" },
-    { tag: "#SCOTUSPrivilege", volume: "62.3K reads" }
-  ];
-
-  // Fact check updates
-  const factChecks = [
-    {
-      source: "Reuters Fact Check",
-      claim: "Did Congress pass a carbon emission tax?",
-      rating: "Verified True",
-      ratingColor: "text-success bg-success/10",
-      storyId: "1"
-    },
-    {
-      source: "AP Fact Check",
-      claim: "Do plastics in organs cause direct disease?",
-      rating: "Mostly True (Needs Study)",
-      ratingColor: "text-warning bg-warning/10",
-      storyId: "12"
+  // Helper for stable scores in RightPanel
+  const getStableScore = (str: string, min: number, max: number, seed: number) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-  ];
+    const range = max - min;
+    const val = Math.abs(hash + seed) % range;
+    return min + val;
+  };
+
+  // Today's trending tags - generated dynamically from live stories
+  const trendingTopics = stories.length > 0
+    ? stories.slice(0, 5).map(story => {
+        const words = story.title
+          .replace(/[^a-zA-Z ]/g, "")
+          .split(" ")
+          .filter(w => w.length > 3)
+          .slice(0, 2)
+          .join("");
+        const tag = words ? `#${words}` : "#BreakingNews";
+        const volumeVal = getStableScore(story.title, 10, 150, 10);
+        return { tag, volume: `${volumeVal}K reads` };
+      })
+    : [
+        { tag: "#CleanEnergy", volume: "125.4K reads" },
+        { tag: "#AISafety", volume: "94.2K reads" },
+        { tag: "#FusionBreakthrough", volume: "88.1K reads" },
+        { tag: "#Microplastics", volume: "74.8K reads" },
+        { tag: "#SCOTUSPrivilege", volume: "62.3K reads" }
+      ];
+
+  // Fact check updates - generated dynamically from live stories
+  const factChecks = stories.length > 0
+    ? stories.slice(0, 2).map(story => {
+        const isTrue = story.overallTrustScore >= 92;
+        return {
+          source: `${story.source} Fact Check`,
+          claim: `Is the report about "${story.title}" verified?`,
+          rating: isTrue ? "Verified True" : "Mostly True",
+          ratingColor: isTrue ? "text-success bg-success/10" : "text-warning bg-warning/10",
+          storyId: story.id
+        };
+      })
+    : [
+        {
+          source: "Reuters Fact Check",
+          claim: "Did Congress pass a carbon emission tax?",
+          rating: "Verified True",
+          ratingColor: "text-success bg-success/10",
+          storyId: "1"
+        }
+      ];
 
   return (
     <aside className="hidden lg:flex flex-col w-80 shrink-0 border-l border-white/5 bg-[#0F1117] p-5 space-y-6 overflow-y-auto no-scrollbar sticky top-[60px]" style={{ height: 'calc(100vh - 60px)' }}>

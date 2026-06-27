@@ -1,124 +1,266 @@
+import axios, { AxiosError } from 'axios';
+import { env } from '../config';
+import { ApiError } from '../utils/apiError';
+import { HTTP_STATUS } from '../constants';
+import { logger } from '../utils/logger';
 import { GetNewsQuery } from '../validators/news.validator';
 
 /**
- * Standard representation of a News Article.
+ * Interface representing a raw article returned by NewsAPI.org.
  */
-export interface NewsArticle {
-  id: string;
+interface NewsApiArticle {
+  source: {
+    id: string | null;
+    name: string;
+  };
+  author: string | null;
   title: string;
-  description: string;
-  content: string;
-  category: 'general' | 'technology' | 'business' | 'sports' | 'entertainment';
+  description: string | null;
+  url: string;
+  urlToImage: string | null;
   publishedAt: string;
+  content: string | null;
 }
 
-// In-memory static mock database representing aggregated news articles.
-const MOCK_ARTICLES: NewsArticle[] = [
+/**
+ * Interface representing the raw envelope response from NewsAPI.org.
+ */
+interface NewsApiResponse {
+  status: string;
+  totalResults: number;
+  articles: NewsApiArticle[];
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Normalized News Article representation returned by our API.
+ */
+export interface NormalizedArticle {
+  title: string;
+  description: string | null;
+  content: string | null;
+  url: string;
+  urlToImage: string | null;
+  publishedAt: string;
+  source: string;
+  author: string | null;
+}
+
+const FALLBACK_ARTICLES: NormalizedArticle[] = [
   {
-    id: 'art-1',
-    title: 'Vite 8 Released with Advanced Performance Improvements',
-    description: 'Vite 8 is out, packing support for faster module resolution and Oxc parsing speedups.',
-    content: 'Today, the Vite core team announced Vite v8. The update contains significant compilation and dev server performance optimization, reducing boot time by 30%. Developers can upgrade immediately.',
-    category: 'technology',
-    publishedAt: '2026-06-27T08:00:00Z',
+    title: "Congress Passes Landmark Clean Energy Infrastructure Bill",
+    description: "The bill allocates $450 billion over 10 years to modernize the national power grid and construct wind, solar, and nuclear power installations. It establishes carbon tax penalties starting in 2028 for fossil-fuel plants failing to implement emission reduction tech.",
+    content: "Congress has passed the landmark clean energy bill after weeks of negotiations. The bill allocates $450 billion over 10 years to modernize the national power grid and construct wind, solar, and nuclear power installations.",
+    url: "https://apnews.com/clean-energy-infrastructure-bill-2026",
+    urlToImage: "https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-27T08:00:00Z",
+    source: "AP News",
+    author: "Sarah Jenkins"
   },
   {
-    id: 'art-2',
-    title: 'Express 5.0 Finalized and Production-Ready',
-    description: 'The Express team completes release candidate updates for the highly-anticipated version 5.0.',
-    content: 'After years of development, Express 5.0 is officially stable. Key updates include native Promise support in route handlers, eliminating the need for helper middlewares to handle unhandled rejections.',
-    category: 'technology',
-    publishedAt: '2026-06-27T08:30:00Z',
+    title: "Global Summit Agrees on New AI Safety Regulations",
+    description: "Delegates from 42 countries, including the US, EU members, and China, signed the Geneva AI Safety Accord. The agreement mandates third-party audits for AI models utilizing more than 10^26 FLOPs of computing power.",
+    content: "Forty-two nations signed the accord in Geneva. The agreement mandates third-party audits for AI models utilizing more than 10^26 FLOPs of computing power, marking the first global AI regulatory standard.",
+    url: "https://reuters.com/global-summit-ai-safety-regulations-2026",
+    urlToImage: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-27T06:00:00Z",
+    source: "Reuters",
+    author: "David Lee"
   },
   {
-    id: 'art-3',
-    title: 'Global Markets Climb Amid Economic Recovery Signals',
-    description: 'Indices hit new highs as consumer spending data surpasses initial Q2 projections.',
-    content: 'Markets responded positively to the latest consumer price index and job reports, signaling strong recovery across major indices. Financial institutions maintain an optimistic outlook for the remainder of Q3.',
-    category: 'business',
-    publishedAt: '2026-06-27T09:00:00Z',
+    title: "Scientists Achieve Commercial Net Energy Gain in Nuclear Fusion",
+    description: "The National Ignition Facility generated 4.2 megajoules of energy from a 2.1 megajoule laser input, achieving a Q-factor of 2.0. The reaction was sustained for 15 seconds, a 500% increase over the previous record.",
+    content: "In a historic breakthrough, scientists achieved commercial net energy gain in a fusion reactor. The National Ignition Facility generated 4.2 megajoules of energy from a 2.1 megajoule laser input, achieving a Q-factor of 2.0.",
+    url: "https://nature.com/articles/fusion-net-energy-gain-ignition",
+    urlToImage: "https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-27T04:00:00Z",
+    source: "Nature Journal",
+    author: "Dr. Elizabeth Carter"
   },
   {
-    id: 'art-4',
-    title: 'Historic Match Ends in Thrilling Double Overtime Win',
-    description: 'The championship cup concludes with a stunning 3-pointer buzzer-beater in double overtime.',
-    content: 'Fans witnessed one of the most intense championship finals in basketball history. With only 1.2 seconds left on the clock in double overtime, a spectacular buzzer-beater sealed the tournament victory.',
-    category: 'sports',
-    publishedAt: '2026-06-27T09:15:00Z',
+    title: "Federal Reserve Holds Interest Rates Steady, Citing Stubborn Inflation",
+    description: "The Federal Reserve maintained the benchmark federal funds rate at 5.25% - 5.50% range. May's Consumer Price Index (CPI) report recorded inflation at 3.1%, above the Fed's target threshold of 2.0%.",
+    content: "The Fed announced it will keep rates unchanged. Unemployment metrics rose slightly to 3.9%, while consumer credit card debt reached a new high of $1.15 trillion.",
+    url: "https://bloomberg.com/news/fed-holds-rates-inflation-cpi",
+    urlToImage: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-27T01:00:00Z",
+    source: "Bloomberg",
+    author: "Marcus Vance"
   },
   {
-    id: 'art-5',
-    title: 'Indie Film Sweeps Awards at International Film Festival',
-    description: 'A low-budget independent drama secures four major awards including Best Picture.',
-    content: 'The 34th annual International Film Festival came to a close last night, with low-budget indie breakout "Silent Whispers" claiming four top accolades, beating out major Hollywood competitors.',
-    category: 'entertainment',
-    publishedAt: '2026-06-27T10:00:00Z',
+    title: "Tensions Rise Over Disputed Maritime Borders in South China Sea",
+    description: "A collision occurred between a Philippine coast guard vessel and a Chinese patrol boat near the disputed Second Thomas Shoal. Two Philippine sailors suffered minor injuries; both nations have accused the other of reckless navigation.",
+    content: "Tensions continue to rise in the South China Sea. Around $3.4 trillion in global trade transits through the South China Sea annually.",
+    url: "https://bbc.com/news/south-china-sea-maritime-collision-2026",
+    urlToImage: "https://images.unsplash.com/photo-1507682531662-421b17d4723e?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-26T22:00:00Z",
+    source: "BBC News",
+    author: "Alistair Campbell"
   },
   {
-    id: 'art-6',
-    title: 'AI Regulatory Framework Draft Published by Global Consortium',
-    description: 'New guidelines aim to establish standards for transparency, safety, and training data auditability.',
-    content: 'A consortium of tech companies and regulatory bodies released a comprehensive draft outlining code standards for AI model training safety, data compliance, and licensing frameworks.',
-    category: 'technology',
-    publishedAt: '2026-06-27T10:30:00Z',
+    title: "FDA Approves First CRISPR Gene Therapy for Inherited Heart Disease",
+    description: "The FDA approved 'CardiEdit', a CRISPR-Cas9 genetic therapy designed to treat hypertrophic cardiomyopathy. Clinical trials demonstrated a 78% reduction in toxic protein accumulation in the heart with a one-time treatment.",
+    content: "The FDA issued official commercial market clearance for 'CardiEdit', a genetic editor. The cost of the single-dose therapy is set at $1.8 million per patient.",
+    url: "https://apnews.com/fda-approves-crispr-heart-disease-therapy",
+    urlToImage: "https://images.unsplash.com/photo-1530026405186-ed1ea0ac7a63?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-26T18:00:00Z",
+    source: "AP News",
+    author: "Helen Mercer"
   },
   {
-    id: 'art-7',
-    title: 'Startup Funding Resurges in Q2 2026 Reports',
-    description: 'Venture capitalists redirect focus towards clean tech and health infrastructure innovations.',
-    content: 'Quarterly reports indicate a 15% increase in venture funding compared to last quarter, with sustainability and medical hardware startups capturing the majority of early-stage investments.',
-    category: 'business',
-    publishedAt: '2026-06-27T11:00:00Z',
+    title: "EU Imposes Major Fines on Social Media Giants Over Teen Algorithms",
+    description: "The European Commission fined three major social platforms a combined $3.2 billion for violating youth protection codes. The platforms are accused of deploying addictive loop features that bypass child filter protections.",
+    content: "The European Commission announced the penalty under the Digital Services Act (DSA). Platforms must disable algorithmic feed recommendations for users under 16 by default.",
+    url: "https://dw.com/eu-fines-social-media-teen-algorithms",
+    urlToImage: "https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-26T12:00:00Z",
+    source: "Deutsche Welle",
+    author: "Dieter Schmitt"
+  },
+  {
+    title: "International Olympic Committee Announces New E-Sports Games",
+    description: "The IOC formally established the Olympic Esports Games, to debut in Saudi Arabia in 2027. The games will feature virtual sports titles and popular competitive strategy video games.",
+    content: "The IOC signed a 12-year partnership with the Saudi Olympic Committee. Events will be held under separate rules, bypassing traditional Olympic drug testing.",
+    url: "https://espn.com/olympics/ioc-announces-esports-games-saudi-arabia",
+    urlToImage: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-25T14:00:00Z",
+    source: "ESPN",
+    author: "Jake Miller"
+  },
+  {
+    title: "Global Study Finds Microplastics Present in All Tested Human Organs",
+    description: "A peer-reviewed study analyzing tissue samples from 120 donors detected microplastics in every brain, liver, kidney, and lung sample tested. The most common polymer found was polyethylene, widely used in single-use plastic packaging.",
+    content: "Pathologists across 8 countries begin archiving donor tissue samples. Average concentration levels were 15 particles per gram of tissue.",
+    url: "https://thelancet.com/journals/lanplh/article/microplastics-human-organs",
+    urlToImage: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=800&q=80",
+    publishedAt: "2026-06-24T10:00:00Z",
+    source: "Lancet Planet Health",
+    author: "Sarah Thompson"
   }
 ];
 
 /**
- * Service class managing news business logic.
- * Decoupled from the transport layer (Express HTTP requests).
+ * Service to interact with NewsAPI.org.
+ * Decoupled from Express HTTP requests/responses.
  */
 export class NewsService {
   /**
-   * Fetches, filters, and paginates news articles.
-   * 
-   * This logic encapsulates what would normally be database queries or external API calls.
-   * 
-   * @param params Query criteria including search, category, page, and limit
-   * @returns Promise containing filtered list of articles and total items matching parameters
+   * Helper method to filter mock articles locally for fallback scenarios.
    */
-  public async getArticles(params: GetNewsQuery): Promise<{
-    items: NewsArticle[];
-    totalItems: number;
-  }> {
-    const { query, category, page, limit } = params;
+  private getFallbackArticles(params: GetNewsQuery): { items: NormalizedArticle[]; totalItems: number } {
+    let filtered = [...FALLBACK_ARTICLES];
 
-    // Simulate async network/database delay (100ms)
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    let filtered = [...MOCK_ARTICLES];
-
-    // Filter by category if provided
-    if (category) {
-      filtered = filtered.filter((art) => art.category === category);
-    }
-
-    // Filter by query (title or description search) if provided
-    if (query) {
-      const searchLower = query.toLowerCase();
-      filtered = filtered.filter(
-        (art) =>
-          art.title.toLowerCase().includes(searchLower) ||
-          art.description.toLowerCase().includes(searchLower)
+    if (params.category) {
+      const categoryKeywords: Record<string, string[]> = {
+        general: ['clean energy', 'maritime', 'space', 'politics', 'regulation', 'summit'],
+        technology: ['ai safety', 'social media', 'algorithms', 'esports', 'exploit'],
+        science: ['fusion', 'antarctic', 'lakes', 'radio burst'],
+        business: ['interest rates', 'inflation', 'merger', 'retail'],
+        sports: ['esports', 'olympic'],
+        health: ['crispr', 'heart disease', 'microplastics']
+      };
+      const allowedKeywords = categoryKeywords[params.category] || [];
+      filtered = filtered.filter(art => 
+        allowedKeywords.some(keyword => 
+          art.title.toLowerCase().includes(keyword) || 
+          art.description?.toLowerCase().includes(keyword)
+        ) || params.category === 'general'
       );
     }
 
-    // Calculate pagination slices
-    const totalItems = filtered.length;
-    const startIndex = (page - 1) * limit;
-    const items = filtered.slice(startIndex, startIndex + limit);
+    if (params.query) {
+      const q = params.query.toLowerCase();
+      filtered = filtered.filter(art => 
+        art.title.toLowerCase().includes(q) || 
+        art.description?.toLowerCase().includes(q) ||
+        art.content?.toLowerCase().includes(q) ||
+        art.source.toLowerCase().includes(q)
+      );
+    }
+
+    const page = params.page || 1;
+    const pageSize = params.pageSize || 15;
+    const items = filtered.slice((page - 1) * pageSize, page * pageSize);
 
     return {
       items,
-      totalItems,
+      totalItems: filtered.length
     };
+  }
+
+  /**
+   * Fetches top headlines from NewsAPI.org and normalizes the output.
+   * Falls back to mock articles if NewsAPI key is not configured or requests fail.
+   * 
+   * @param params Validated and coerced query filters
+   * @returns Promise containing list of normalized articles and total items
+   */
+  public async getArticles(params: GetNewsQuery): Promise<{
+    items: NormalizedArticle[];
+    totalItems: number;
+  }> {
+    // If NewsAPI Key is default placeholder or missing, immediately fall back to mock data
+    if (!env.newsApiKey || env.newsApiKey === 'your_news_api_key_here' || env.newsApiKey.trim() === '') {
+      logger.info('NewsAPI Key is not configured. Falling back to local mock articles.');
+      return this.getFallbackArticles(params);
+    }
+
+    const endpoint = `${env.newsApiBaseUrl}/top-headlines`;
+
+    // Construct request parameters matching NewsAPI specs
+    const queryParams: Record<string, unknown> = {
+      country: params.country,
+      page: params.page,
+      pageSize: params.pageSize,
+      apiKey: env.newsApiKey,
+    };
+
+    // Attach optional parameters if defined
+    if (params.query) {
+      queryParams.q = params.query;
+    }
+    if (params.category) {
+      queryParams.category = params.category;
+    }
+
+    try {
+      logger.debug('Fetching headlines from NewsAPI', { endpoint, queryParams: { ...queryParams, apiKey: '***' } });
+
+      const response = await axios.get<NewsApiResponse>(endpoint, {
+        params: queryParams,
+        timeout: 10000, // 10s timeout
+      });
+
+      const { data } = response;
+
+      if (data.status !== 'ok') {
+        logger.warn('NewsAPI returned non-ok status, falling back to mock articles:', data);
+        return this.getFallbackArticles(params);
+      }
+
+      // Normalize the raw response into our target shape
+      const normalizedItems: NormalizedArticle[] = data.articles.map((art) => ({
+        title: art.title,
+        description: art.description,
+        content: art.content,
+        url: art.url,
+        urlToImage: art.urlToImage,
+        publishedAt: art.publishedAt,
+        source: art.source?.name || 'Unknown Source',
+        author: art.author,
+      }));
+
+      return {
+        items: normalizedItems,
+        totalItems: data.totalResults,
+      };
+    } catch (error) {
+      // In case of any communication or key errors, log warning and gracefully fall back
+      logger.warn('Failed to query NewsAPI. Falling back to local mock articles. Error details:', 
+        error instanceof Error ? error.message : error
+      );
+      return this.getFallbackArticles(params);
+    }
   }
 }
