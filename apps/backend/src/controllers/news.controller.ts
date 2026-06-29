@@ -34,13 +34,25 @@ export class NewsController {
       // Cast the validated and coerced query params from the validation middleware
       const queryParams = req.query as unknown as GetNewsQuery;
 
-      const { items } = await this.newsService.getArticles(queryParams);
+      const { items, totalItems } = await this.newsService.getArticles(queryParams);
 
-      const response: ApiResponse<NormalizedArticle[]> = {
+      // Build active filters configuration dynamically from request parameters
+      const filters: Record<string, string> = {};
+      if (queryParams.category) {
+        filters.category = queryParams.category;
+      }
+      if (queryParams.country) {
+        filters.country = queryParams.country;
+      }
+
+      // Structure the payload exactly according to Phase 2 response format specifications
+      const response = {
         success: true,
-        message: 'Successfully retrieved news articles.',
+        totalResults: totalItems,
+        page: queryParams.page,
+        pageSize: queryParams.pageSize,
+        filters,
         data: items,
-        timestamp: new Date().toISOString(),
       };
 
       res.status(HTTP_STATUS.OK).json(response);

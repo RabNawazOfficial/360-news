@@ -4,7 +4,6 @@ import {
   TrendingUp, 
   Bookmark, 
   Globe, 
-  Landmark, 
   Cpu, 
   Briefcase, 
   FlaskConical, 
@@ -12,7 +11,8 @@ import {
   Trophy,
   ChevronLeft,
   ChevronRight,
-  Compass
+  Compass,
+  Sparkles
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -41,13 +41,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const categories = [
-    { name: 'World', icon: Globe },
-    { name: 'Politics', icon: Landmark },
+    { name: 'General', icon: Globe },
     { name: 'Technology', icon: Cpu },
     { name: 'Business', icon: Briefcase },
+    { name: 'Sports', icon: Trophy },
     { name: 'Science', icon: FlaskConical },
     { name: 'Health', icon: HeartPulse },
-    { name: 'Sports', icon: Trophy },
+    { name: 'Entertainment', icon: Sparkles },
   ];
 
   const handleCategorySelect = (categoryName: string) => {

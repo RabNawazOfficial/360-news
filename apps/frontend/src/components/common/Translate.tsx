@@ -14,18 +14,29 @@ export const Translate: React.FC<TranslateProps> = ({
 }) => {
   const { language, translateText } = useLanguage();
   const [translatedText, setTranslatedText] = useState(children);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => language !== 'en' && !!children.trim());
 
-  useEffect(() => {
-    let isMounted = true;
+  // Sync state during render when props change to avoid synchronous setState inside useEffect
+  const [prevLanguage, setPrevLanguage] = useState(language);
+  const [prevChildren, setPrevChildren] = useState(children);
 
+  if (language !== prevLanguage || children !== prevChildren) {
+    setPrevLanguage(language);
+    setPrevChildren(children);
     if (language === 'en' || !children.trim()) {
       setTranslatedText(children);
       setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
+  useEffect(() => {
+    if (language === 'en' || !children.trim()) {
       return;
     }
 
-    setLoading(true);
+    let isMounted = true;
     translateText(children, language)
       .then((result) => {
         if (isMounted) {

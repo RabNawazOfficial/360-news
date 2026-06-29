@@ -15,13 +15,21 @@ export interface NormalizedArticle {
 
 /**
  * Standard Envelope wrapping all API Response bodies from the backend.
+ * Conforms to both general errors and Phase 2 pagination metrics.
  */
 export interface ApiResponse<T = unknown> {
   success: boolean;
-  message: string;
+  message?: string;
   data?: T;
   errors?: unknown[];
-  timestamp: string;
+  timestamp?: string;
+  totalResults?: number;
+  page?: number;
+  pageSize?: number;
+  filters?: {
+    category?: string;
+    country?: string;
+  };
 }
 
 /**

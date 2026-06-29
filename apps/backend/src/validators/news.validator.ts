@@ -13,10 +13,19 @@ import { z } from 'zod';
  */
 export const getNewsQuerySchema = z.object({
   query: z.string().optional(),
-  category: z.enum(['general', 'technology', 'business', 'sports', 'entertainment', 'science', 'health']).optional(),
-  country: z.string().default('us'),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(15),
+  category: z.enum(['business', 'entertainment', 'general', 'health', 'science', 'sports', 'technology']).optional(),
+  country: z.enum(['in', 'us', 'gb', 'au', 'ca', 'de', 'fr', 'jp']).default('us'),
+  page: z.coerce
+    .number()
+    .int('Page must be an integer')
+    .min(1, 'Page must be greater than or equal to 1')
+    .default(1),
+  pageSize: z.coerce
+    .number()
+    .int('Page size must be an integer')
+    .min(1, 'Page size must be at least 1')
+    .max(50, 'Page size must be at most 50')
+    .default(15),
 });
 
 /**

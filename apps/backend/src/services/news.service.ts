@@ -193,8 +193,12 @@ export class NewsService {
    * Fetches top headlines from NewsAPI.org and normalizes the output.
    * Falls back to mock articles if NewsAPI key is not configured or requests fail.
    * 
-   * @param params Validated and coerced query filters
-   * @returns Promise containing list of normalized articles and total items
+   * This method dynamically constructs query parameters based on the incoming GetNewsQuery
+   * object by mapping our API validator keys to the parameter keys expected by NewsAPI.org.
+   * This ensures we avoid hardcoding individual parameters inside the function logic.
+   * 
+   * @param params Validated and coerced query filters containing page, pageSize, category, country, and optional query
+   * @returns Promise containing list of normalized articles and total items matching the filter
    */
   public async getArticles(params: GetNewsQuery): Promise<{
     items: NormalizedArticle[];
@@ -208,20 +212,25 @@ export class NewsService {
 
     const endpoint = `${env.newsApiBaseUrl}/top-headlines`;
 
-    // Construct request parameters matching NewsAPI specs
+    // Dictionary mapping our validation query keys to the parameters expected by NewsAPI.org
+    const parameterMap: Record<keyof GetNewsQuery, string> = {
+      query: 'q',
+      category: 'category',
+      country: 'country',
+      page: 'page',
+      pageSize: 'pageSize'
+    };
+
+    // Dynamically build the query parameters object
     const queryParams: Record<string, unknown> = {
-      country: params.country,
-      page: params.page,
-      pageSize: params.pageSize,
       apiKey: env.newsApiKey,
     };
 
-    // Attach optional parameters if defined
-    if (params.query) {
-      queryParams.q = params.query;
-    }
-    if (params.category) {
-      queryParams.category = params.category;
+    for (const [key, value] of Object.entries(params)) {
+      const mappedKey = parameterMap[key as keyof GetNewsQuery];
+      if (mappedKey && value !== undefined && value !== null) {
+        queryParams[mappedKey] = value;
+      }
     }
 
     try {

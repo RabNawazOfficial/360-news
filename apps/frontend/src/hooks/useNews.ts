@@ -3,88 +3,216 @@ import axios from 'axios';
 import { NewsService } from '../services/news.service';
 import type { NormalizedArticle, GetNewsParams } from '../types/news';
 
+// Global cache to persist loaded pages and articles across component mount/unmount and renders
+const globalNewsCache: Record<string, {
+  articles: NormalizedArticle[];
+  page: number;
+  totalResults: number;
+  hasMore: boolean;
+}> = {};
+
 /**
- * Reusable React hook for fetching and managing news article state.
+ * Reusable React hook for fetching and managing news article state with pagination and caching.
  * 
- * Handles local state for request load status, error reports, and current articles list.
- * Automatically runs fetches on component mounting and triggers new queries if parameters
- * (e.g. search query or category filters) change.
+ * Handles query parameter inputs for category, country, and query searches. It maintains
+ * a client-side in-memory cache of already loaded pages to ensure instant navigation.
  * 
- * Utilizes AbortController to cancel outdated requests on criteria updates or component unmount.
- * 
- * @param params Optional news filtering query params (category, search, page criteria)
- * @returns React bindings: loading state, error text, article data arrays, and manual refresh handle
+ * @param params GetNewsParams containing category, country, and query filters
  */
-export const useNews = (params?: GetNewsParams) => {
-  const [loading, setLoading] = useState<boolean>(true);
+export const useNews = (params: GetNewsParams = {}) => {
+  const { query, category, country } = params;
+
+  // Generate a unique cache key based on active query filters
+  const cacheKey = `${category || 'general'}_${country || 'us'}_${query || ''}`;
+
+  // Read initial states from cache if available, otherwise default
+  const getInitialState = () => {
+    const cached = globalNewsCache[cacheKey];
+    if (cached) {
+      return {
+        articles: cached.articles,
+        page: cached.page,
+        hasMore: cached.hasMore
+      };
+    }
+    return {
+      articles: [],
+      page: 1,
+      hasMore: true
+    };
+  };
+
+  const initialState = getInitialState();
+
+  const [news, setNews] = useState<NormalizedArticle[]>(initialState.articles);
+  const [page, setPage] = useState<number>(initialState.page);
+  const [hasMore, setHasMore] = useState<boolean>(initialState.hasMore);
+
+  const [loading, setLoading] = useState<boolean>(!globalNewsCache[cacheKey]);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [news, setNews] = useState<NormalizedArticle[]>([]);
 
-  // Create a single instance of the service
   const newsServiceRef = useRef(new NewsService());
-
-  // Stringify params to enable stable hook dependencies tracking
-  const paramsString = JSON.stringify(params);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * Executes news query transactions.
+   * Helper function to fetch a specific page of articles.
    * 
-   * @param signal AbortSignal to trigger axios cancel token mapping
+   * @param targetPage Page number to request
+   * @param isFirstPage If true, resets news list; if false, appends to it
    */
-  const fetchArticles = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
+  const fetchPage = useCallback(async (targetPage: number, isFirstPage: boolean) => {
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    if (isFirstPage) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
 
     try {
-      const parsedParams: GetNewsParams = paramsString ? JSON.parse(paramsString) : {};
-      const articles = await newsServiceRef.current.getNews(parsedParams, signal);
-      
-      if (!signal?.aborted) {
-        setNews(articles);
-      }
-    } catch (err: any) {
-      // Gracefully capture cancellation events
-      if (
-        signal?.aborted || 
-        axios.isCancel(err) || 
-        err.name === 'CanceledError' || 
-        err.name === 'AbortError'
-      ) {
+      const response = await newsServiceRef.current.getNews({
+        query,
+        category,
+        country,
+        page: targetPage,
+        pageSize: 15,
+      }, controller.signal);
+
+      if (controller.signal.aborted) return;
+
+      const newArticles = response.data || [];
+      const total = response.totalResults || 0;
+
+      setNews((prevNews) => {
+        let updated: NormalizedArticle[];
+        if (isFirstPage) {
+          updated = newArticles;
+        } else {
+          // Avoid duplicate articles by filtering by URL
+          const existingUrls = new Set(prevNews.map((a) => a.url));
+          const uniqueNewArticles = newArticles.filter((a) => !existingUrls.has(a.url));
+          updated = [...prevNews, ...uniqueNewArticles];
+        }
+
+        const loadedCount = updated.length;
+        const moreAvailable = loadedCount < total && newArticles.length > 0;
+
+        // Persist back to the cache
+        globalNewsCache[cacheKey] = {
+          articles: updated,
+          page: targetPage,
+          totalResults: total,
+          hasMore: moreAvailable,
+        };
+
+        setHasMore(moreAvailable);
+        setPage(targetPage);
+
+        return updated;
+      });
+
+    } catch (err: unknown) {
+      if (axios.isCancel(err) || controller.signal.aborted) {
         return;
       }
-
-      const errorMessage =
-        err.response?.data?.message || err.message || 'Failed to fetch news articles.';
+      let errorMessage = 'Failed to fetch news articles.';
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
       setError(errorMessage);
     } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
+      if (!controller.signal.aborted) {
+        if (isFirstPage) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
       }
     }
-  }, [paramsString]);
+  }, [category, country, query, cacheKey]);
 
-  // Handle automatic query dispatch on criteria changes and lifecycle unmounting cleanup
+  // Adjust state during render when cacheKey changes
+  const [prevCacheKey, setPrevCacheKey] = useState<string>(cacheKey);
+  if (cacheKey !== prevCacheKey) {
+    setPrevCacheKey(cacheKey);
+    const cached = globalNewsCache[cacheKey];
+    if (cached) {
+      setNews(cached.articles);
+      setPage(cached.page);
+      setHasMore(cached.hasMore);
+      setLoading(false);
+      setError(null);
+    } else {
+      setNews([]);
+      setPage(1);
+      setHasMore(true);
+      setLoading(true);
+      setError(null);
+    }
+  }
+
+  // Fetch page 1 on cacheKey change if not cached
   useEffect(() => {
-    const controller = new AbortController();
-    fetchArticles(controller.signal);
+    const cached = globalNewsCache[cacheKey];
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    
+    if (!cached) {
+      // Defer execution to next tick to prevent synchronous setState cascading renders in effect body
+      timerId = setTimeout(() => {
+        fetchPage(1, true);
+      }, 0);
+    }
 
     return () => {
-      controller.abort();
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+      // Cancel active request when the cache key changes
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
-  }, [fetchArticles]);
+  }, [cacheKey, fetchPage]);
 
   /**
-   * Manually dispatches news queries with the active search parameters.
+   * Triggers loading the next page of results if available.
+   */
+  const loadMore = useCallback(async () => {
+    // Prevent duplicate requests and loading if we don't have more
+    if (loading || loadingMore || !hasMore) {
+      return;
+    }
+    const nextPage = page + 1;
+    await fetchPage(nextPage, false);
+  }, [loading, loadingMore, hasMore, page, fetchPage]);
+
+  /**
+   * Refetches the first page of news.
    */
   const refetch = useCallback(() => {
-    return fetchArticles();
-  }, [fetchArticles]);
+    fetchPage(1, true);
+  }, [fetchPage]);
 
   return {
     loading,
+    loadingMore,
     error,
     news,
     refetch,
+    loadMore,
+    hasMore,
+    page,
   };
 };
+
 export default useNews;

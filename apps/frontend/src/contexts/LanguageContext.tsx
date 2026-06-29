@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type LanguageCode = 'en' | 'hi' | 'fr' | 'ar' | 'zh' | 'ja' | 'ko' | 'bn';
@@ -495,7 +496,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       
       const data = await res.json();
       if (data && data[0]) {
-        const translatedText = data[0].map((segment: any) => segment[0] || '').join('');
+        const translatedText = data[0].map((segment: unknown) => (Array.isArray(segment) ? String(segment[0] || '') : '')).join('');
         if (translatedText) {
           localStorage.setItem(cacheKey, translatedText);
           return translatedText;

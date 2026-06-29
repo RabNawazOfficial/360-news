@@ -101,20 +101,32 @@ const normalizeToNewsStory = (article: NormalizedArticle, activeCategory: string
 
 const mapUiCategoryToApiCategory = (uiCategory: string): NewsCategory | undefined => {
   const map: Record<string, NewsCategory> = {
-    'World': 'general',
-    'Politics': 'general',
+    'General': 'general',
     'Technology': 'technology',
     'Business': 'business',
     'Science': 'science',
     'Health': 'health',
     'Sports': 'sports',
+    'Entertainment': 'entertainment',
   };
   return map[uiCategory];
 };
 
+const countries = [
+  { code: 'in', name: 'India', flag: '🇮🇳' },
+  { code: 'us', name: 'United States', flag: '🇺🇸' },
+  { code: 'gb', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'au', name: 'Australia', flag: '🇦🇺' },
+  { code: 'ca', name: 'Canada', flag: '🇨🇦' },
+  { code: 'de', name: 'Germany', flag: '🇩🇪' },
+  { code: 'fr', name: 'France', flag: '🇫🇷' },
+  { code: 'jp', name: 'Japan', flag: '🇯🇵' },
+];
+
 function App() {
   const [activeTab, setActiveTab] = useState<string>('feed');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(() => localStorage.getItem('360_news_category') || null);
+  const [activeCountry, setActiveCountry] = useState<string>(() => localStorage.getItem('360_news_country') || 'us');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
   const [bookmarkedArticles, setBookmarkedArticles] = useState<NewsStory[]>([]);
@@ -139,22 +151,40 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const langDropdownRef = useRef<HTMLDivElement>(null);
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
 
   const { language, setLanguage, t } = useLanguage();
 
-  // Close dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (langDropdownRef.current && !langDropdownRef.current.contains(event.target as Node)) {
         setIsLangOpen(false);
       }
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
+        setIsCountryOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Persist category, country, and page in localStorage
+  useEffect(() => {
+    if (activeCategory === null) {
+      localStorage.removeItem('360_news_category');
+    } else {
+      localStorage.setItem('360_news_category', activeCategory);
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    localStorage.setItem('360_news_country', activeCountry);
+  }, [activeCountry]);
 
   // Sync theme changes with the DOM element
   useEffect(() => {
@@ -200,9 +230,10 @@ function App() {
   const mappedCategory = activeCategory ? mapUiCategoryToApiCategory(activeCategory) : undefined;
   
   // Call useNews hook for fetching live backend articles
-  const { loading, error, news, refetch } = useNews({
+  const { loading, error, news, refetch, loadingMore, loadMore, hasMore, page } = useNews({
     query: debouncedSearchTerm.trim() || undefined,
     category: mappedCategory,
+    country: activeCountry,
   });
 
   const normalizedStories = news.map(art => normalizeToNewsStory(art, activeCategory));
@@ -222,9 +253,20 @@ function App() {
       ? normalizedStories.filter(story => story.isBreaking || story.overallTrustScore >= 92)
       : normalizedStories;
 
+  useEffect(() => {
+    localStorage.setItem('360_news_page', String(page));
+  }, [page]);
+
+  // Trigger pagination loading when scrolled close to the bottom card
+  useEffect(() => {
+    if (activeCardIndex >= filteredStories.length - 2 && filteredStories.length > 0 && hasMore && !loadingMore && !loading) {
+      loadMore();
+    }
+  }, [activeCardIndex, filteredStories.length, hasMore, loadingMore, loading, loadMore]);
+
   // Handle cross-navigation scrolling
   const handleSelectStory = (storyId: string) => {
-    let index = filteredStories.findIndex(s => s.id === storyId);
+    const index = filteredStories.findIndex(s => s.id === storyId);
 
     if (index === -1) {
       setSearchTerm('');
@@ -336,6 +378,50 @@ function App() {
               {t("Category")}: {t(activeCategory)}
             </span>
           )}
+
+          {/* Country Selector Dropdown */}
+          <div className="relative" ref={countryDropdownRef}>
+            <button
+              onClick={() => setIsCountryOpen(!isCountryOpen)}
+              className="flex items-center space-x-2 p-2 rounded-xl bg-[#0F1117] border border-white/5 text-textSecondary hover:text-white transition-colors"
+              title={t("Change Country")}
+              aria-label={t("Change Country")}
+            >
+              <span className="text-xs font-semibold uppercase">
+                {(countries.find(c => c.code === activeCountry) || countries[1]).flag} {(countries.find(c => c.code === activeCountry) || countries[1]).code}
+              </span>
+            </button>
+            
+            {isCountryOpen && (
+              <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-[#171923]/95 border border-white/10 shadow-glass backdrop-blur-md py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="px-3 py-1.5 text-[10px] font-bold text-textSecondary uppercase tracking-wider border-b border-white/5 mb-1 select-none">
+                  Select Country
+                </div>
+                {countries.map((c) => (
+                  <button
+                    key={c.code}
+                    onClick={() => {
+                      setActiveCountry(c.code);
+                      setIsCountryOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left ${
+                      activeCountry === c.code
+                        ? 'bg-primary/10 text-primary font-bold'
+                        : 'text-textSecondary hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center space-x-2">
+                      <span>{c.flag}</span>
+                      <span>{t(c.name)}</span>
+                    </span>
+                    {activeCountry === c.code && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Language Selector Dropdown */}
           <div className="relative" ref={langDropdownRef}>
@@ -535,17 +621,28 @@ function App() {
                 </button>
               </div>
             ) : (
-              filteredStories.map((story, index) => (
-                <ReelCard
-                  key={story.id}
-                  story={story}
-                  isBookmarked={bookmarkedIds.includes(story.id)}
-                  onToggleBookmark={handleToggleBookmark}
-                  fontScale={fontScale}
-                  setFontScale={setFontScale}
-                  isActive={index === activeCardIndex}
-                />
-              ))
+              <>
+                {filteredStories.map((story, index) => (
+                  <ReelCard
+                    key={story.id}
+                    story={story}
+                    isBookmarked={bookmarkedIds.includes(story.id)}
+                    onToggleBookmark={handleToggleBookmark}
+                    fontScale={fontScale}
+                    setFontScale={setFontScale}
+                    isActive={index === activeCardIndex}
+                  />
+                ))}
+                
+                {loadingMore && (
+                  <div className="snap-card w-full flex items-center justify-center p-3 md:p-6 bg-[#0F1117]">
+                    <div className="w-full max-w-xl h-[calc(100svh-90px)] md:h-[calc(100vh-100px)] bg-[#171923] rounded-3xl border border-white/5 shadow-glass flex flex-col items-center justify-center space-y-4">
+                      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs text-textSecondary">{t("Loading more viewpoints...")}</p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
